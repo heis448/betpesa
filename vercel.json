@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/backend/(.*)",
+      "destination": "https://api.borauhaiboracenters.co.ke/betpesa/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

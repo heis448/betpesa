@@ -1,0 +1,75 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.middle {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.canvasArea {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.sideDesktop { display: none; }
+
+.bottom {
+  flex-shrink: 0;
+  background: #0a0c1a;
+  border-top: 1px solid var(--border);
+}
+
+.betPanels {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+}
+
+/* ── MOBILE NAV ── */
+.mobileNav {
+  display: flex;
+  border-top: 1px solid var(--border);
+  background: #080a18;
+}
+
+.navBtn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 7px 4px 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.navBtn:hover { background: rgba(255,255,255,0.03); }
+.navIcon  { font-size: 15px; line-height: 1; }
+.navLabel { font-size: 8px; font-weight: 700; color: var(--muted); letter-spacing: 0.05em; text-transform: uppercase; }
+
+.navLogin .navLabel { color: var(--green); }
+.navLogin .navIcon  { filter: hue-rotate(0deg); }
+
+/* ── DESKTOP ── */
+@media (min-width: 768px) {
+  .sideDesktop { display: flex; }
+  .mobileNav   { display: none; }
+  .betPanels   { padding: 10px 12px; gap: 10px; }
+}
+
+@media (min-width: 1100px) {
+  .betPanels { max-width: 860px; }
+}

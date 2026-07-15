@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Roboto+Mono:wght@400;600;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* ── PALETTE ── */
+  --bg:          #0d0f1e;
+  --bg2:         #111426;
+  --surface:     #161b2e;
+  --card:        #1b2035;
+  --border:      #252a45;
+  --border2:     #1e2340;
+
+  /* ── BRAND ── */
+  --red:         #ff3e3e;
+  --red-dark:    #c0392b;
+  --red-glow:    rgba(255,62,62,0.3);
+  --orange:      #ff6b35;
+  --orange-glow: rgba(255,107,53,0.35);
+  --green:       #26de81;
+  --green-dark:  #20bf6b;
+  --green-glow:  rgba(38,222,129,0.3);
+  --gold:        #fed330;
+  --gold-glow:   rgba(254,211,48,0.25);
+  --blue:        #4a90e2;
+
+  /* ── TEXT ── */
+  --text:        #e8eaf6;
+  --text2:       #a0a8c8;
+  --muted:       #5a6180;
+
+  /* ── LAYOUT ── */
+  --topbar-h:    44px;
+  --histbar-h:   36px;
+  --bottom-h:    210px;      /* mobile bet panels */
+  --side-w:      200px;      /* desktop live bets */
+  --radius:      10px;
+  --radius-lg:   14px;
+
+  /* ── FONTS ── */
+  --font:        'Montserrat', sans-serif;
+  --mono:        'Roboto Mono', monospace;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  touch-action: manipulation;
+}
+
+button { cursor: pointer; font-family: var(--font); border: none; outline: none; }
+input  { font-family: var(--mono); outline: none; }
+input[type=number] { appearance: textfield; -moz-appearance: textfield; }
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+/* scrollbar */
+::-webkit-scrollbar       { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
