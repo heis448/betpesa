@@ -1,6 +1,8 @@
 {
-  "env": {
-    "VITE_SOCKET_URL": "https://mv.makamesco-tech.co.ke"
+  "build": {
+    "env": {
+      "VITE_SOCKET_URL": "https://mv.makamesco-tech.co.ke"
+    }
   },
   "rewrites": [
     {
