@@ -24,7 +24,7 @@ export function useSocket() {
 
     socket = io(SOCKET_URL, {
       ...authOpts,
-      path: '/backend/socket.io',
+      path: '/betpesa/socket.io',
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 10,
     })
