@@ -1,51 +1,43 @@
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Roboto+Mono:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@500;600;700&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  /* ── PALETTE ── */
-  --bg:          #0d0f1e;
-  --bg2:         #111426;
-  --surface:     #161b2e;
-  --card:        #1b2035;
-  --border:      #252a45;
-  --border2:     #1e2340;
+  --bg:          #0b0e1a;
+  --bg2:         #0f1221;
+  --surface:     #141828;
+  --card:        #181d2e;
+  --border:      #1e2438;
+  --border2:     #252b42;
 
-  /* ── BRAND ── */
-  --red:         #ff3e3e;
-  --red-dark:    #c0392b;
-  --red-glow:    rgba(255,62,62,0.3);
+  --red:         #f23645;
+  --red-dark:    #c0202e;
+  --red-glow:    rgba(242,54,69,0.35);
   --orange:      #ff6b35;
   --orange-glow: rgba(255,107,53,0.35);
-  --green:       #26de81;
-  --green-dark:  #20bf6b;
-  --green-glow:  rgba(38,222,129,0.3);
-  --gold:        #fed330;
-  --gold-glow:   rgba(254,211,48,0.25);
+  --green:       #00c896;
+  --green-dark:  #00a87c;
+  --green-glow:  rgba(0,200,150,0.3);
+  --gold:        #ffd60a;
+  --gold-glow:   rgba(255,214,10,0.25);
   --blue:        #4a90e2;
+  --purple:      #7c3aed;
 
-  /* ── TEXT ── */
   --text:        #e8eaf6;
-  --text2:       #a0a8c8;
-  --muted:       #5a6180;
+  --text2:       #8892b0;
+  --muted:       #4a5278;
 
-  /* ── LAYOUT ── */
-  --topbar-h:    44px;
-  --histbar-h:   36px;
-  --bottom-h:    210px;      /* mobile bet panels */
-  --side-w:      200px;      /* desktop live bets */
-  --radius:      10px;
-  --radius-lg:   14px;
+  --topbar-h:    48px;
+  --side-w:      220px;
+  --radius:      8px;
+  --radius-lg:   12px;
 
-  /* ── FONTS ── */
-  --font:        'Montserrat', sans-serif;
+  --font:        'Inter', sans-serif;
+  --display:     'Rajdhani', sans-serif;
   --mono:        'Roboto Mono', monospace;
 }
 
-html, body, #root {
-  height: 100%;
-  overflow: hidden;
-}
+html, body, #root { height: 100%; overflow: hidden; }
 
 body {
   background: var(--bg);
@@ -61,7 +53,6 @@ input  { font-family: var(--mono); outline: none; }
 input[type=number] { appearance: textfield; -moz-appearance: textfield; }
 input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
 
-/* scrollbar */
-::-webkit-scrollbar       { width: 3px; }
+::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
