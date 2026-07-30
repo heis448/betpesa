@@ -107,6 +107,7 @@ export function useSocket() {
     })
 
     socket.on('cashout:success', ({ multiplier, payout, profit, balance, panel }) => {
+      if (window.__betpesaCashout) window.__betpesaCashout(payout, multiplier)
       updateBet(panel || 1, { cashedOut: true, cashedAtMult: multiplier, cashing: false })
       updateBalance(balance)
     })
