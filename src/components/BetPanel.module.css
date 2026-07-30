@@ -6,7 +6,7 @@
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
   min-width: 0;
 }
 
@@ -14,54 +14,48 @@
 .tabs {
   display: flex;
   background: var(--bg2);
-  border-radius: 6px;
+  border-radius: 7px;
   padding: 3px;
   gap: 3px;
 }
 
-.tab {
+.tab, .tabInactive {
   flex: 1;
   padding: 5px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-  background: transparent;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   border: none;
-  transition: all 0.15s;
+  cursor: pointer;
   text-transform: uppercase;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.15s;
 }
 
-.tabActive {
-  background: var(--surface);
-  color: var(--text);
-}
+.tab       { background: var(--surface); color: var(--text); }
+.tabInactive { background: transparent; color: var(--muted); }
 
 /* ── AMOUNT ── */
 .amtRow {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
 }
 
 .adj {
-  width: 32px;
-  height: 36px;
+  width: 34px; height: 38px;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border2);
   border-radius: 8px;
   color: var(--text2);
   font-size: 18px;
   font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
   transition: all 0.15s;
 }
-
-.adj:hover { background: var(--border); color: var(--text); }
+.adj:hover { background: var(--border2); color: var(--text); }
 
 .amtWrap {
   flex: 1;
@@ -69,7 +63,7 @@
   display: flex;
   align-items: center;
   background: var(--bg2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border2);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -79,14 +73,13 @@
   background: transparent;
   border: none;
   color: var(--text);
-  font-family: var(--mono);
-  font-size: 14px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 18px;
   font-weight: 600;
-  padding: 10px 8px;
+  padding: 8px 8px;
   text-align: center;
   min-width: 0;
 }
-
 .amtInput:disabled { opacity: 0.5; }
 
 .currency {
@@ -95,13 +88,11 @@
   padding-right: 8px;
   letter-spacing: 0.05em;
   flex-shrink: 0;
+  font-family: 'Inter', sans-serif;
 }
 
 /* ── QUICK ── */
-.quickRow {
-  display: flex;
-  gap: 4px;
-}
+.quickRow { display: flex; gap: 4px; }
 
 .quick {
   flex: 1;
@@ -110,15 +101,15 @@
   border-radius: 6px;
   color: var(--text2);
   font-size: 10px;
-  font-weight: 600;
-  padding: 6px 2px;
+  font-weight: 700;
+  padding: 5px 2px;
   transition: all 0.15s;
+  font-family: 'Inter', sans-serif;
 }
-
 .quick:hover {
-  border-color: var(--orange);
-  color: var(--orange);
-  background: rgba(255,107,53,0.08);
+  border-color: #00c896;
+  color: #00c896;
+  background: rgba(0,200,150,0.08);
 }
 
 /* ── AUTO CASHOUT ── */
@@ -133,16 +124,15 @@
   color: var(--muted);
   flex: 1;
   white-space: nowrap;
+  font-family: 'Inter', sans-serif;
 }
 
 .toggle {
   position: relative;
-  width: 34px;
-  height: 18px;
+  width: 34px; height: 18px;
   flex-shrink: 0;
   cursor: pointer;
 }
-
 .toggle input { opacity: 0; width: 0; height: 0; }
 
 .slider {
@@ -152,7 +142,6 @@
   border-radius: 18px;
   transition: 0.2s;
 }
-
 .slider::before {
   content: '';
   position: absolute;
@@ -162,22 +151,21 @@
   border-radius: 50%;
   transition: 0.2s;
 }
-
-.toggle input:checked + .slider { background: var(--green-dark); }
+.toggle input:checked + .slider { background: #00a87c; }
 .toggle input:checked + .slider::before { transform: translateX(16px); }
 
 .autoInput {
-  width: 52px;
+  width: 54px;
   background: var(--bg2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border2);
   border-radius: 6px;
   color: var(--text);
   font-size: 11px;
   font-weight: 600;
   padding: 4px 6px;
   text-align: center;
+  font-family: 'Roboto Mono', monospace;
 }
-
 .autoInput:disabled { opacity: 0.35; cursor: not-allowed; }
 .autoX { font-size: 10px; color: var(--muted); flex-shrink: 0; }
 
@@ -185,47 +173,45 @@
 .mainBtn {
   width: 100%;
   padding: 13px;
-  border-radius: 8px;
+  border-radius: 9px;
   font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   transition: all 0.18s;
   border: none;
+  font-family: 'Inter', sans-serif;
 }
 
 .btnBet {
-  background: linear-gradient(135deg, var(--green), var(--green-dark));
+  background: linear-gradient(135deg, #00c896, #00a87c);
   color: #000;
-  box-shadow: 0 3px 16px var(--green-glow);
+  box-shadow: 0 3px 18px rgba(0,200,150,0.35);
 }
-
-.btnBet:hover { transform: translateY(-1px); box-shadow: 0 5px 22px var(--green-glow); }
+.btnBet:hover { transform: translateY(-1px); box-shadow: 0 5px 24px rgba(0,200,150,0.45); }
 
 .btnCancel {
-  background: rgba(255,62,62,0.12);
+  background: rgba(242,54,69,0.1);
   color: var(--red);
-  border: 1px solid rgba(255,62,62,0.3);
+  border: 1px solid rgba(242,54,69,0.3);
 }
-
-.btnCancel:hover { background: rgba(255,62,62,0.2); }
+.btnCancel:hover { background: rgba(242,54,69,0.18); }
 
 .btnCash {
-  background: linear-gradient(135deg, var(--red), var(--red-dark));
+  background: linear-gradient(135deg, #f23645, #c0202e);
   color: #fff;
-  box-shadow: 0 3px 16px var(--red-glow);
+  box-shadow: 0 3px 18px rgba(242,54,69,0.35);
   animation: cashPulse 1s ease-in-out infinite;
 }
-
 @keyframes cashPulse {
-  0%,100% { box-shadow: 0 3px 16px var(--red-glow); }
-  50%      { box-shadow: 0 4px 28px rgba(255,62,62,0.55); }
+  0%,100% { box-shadow: 0 3px 18px rgba(242,54,69,0.35); }
+  50%      { box-shadow: 0 5px 30px rgba(242,54,69,0.6); }
 }
 
 .btnDone {
-  background: rgba(38,222,129,0.12);
-  color: var(--green);
-  border: 1px solid rgba(38,222,129,0.3);
+  background: rgba(0,200,150,0.1);
+  color: #00c896;
+  border: 1px solid rgba(0,200,150,0.3);
   cursor: default;
 }
 
@@ -235,51 +221,25 @@
   cursor: not-allowed;
 }
 
-.mainBtn:disabled {
-  cursor: not-allowed;
-  transform: none !important;
-}
+.mainBtn:disabled { cursor: not-allowed; transform: none !important; }
 
-/* ── DEMO MODE ── */
+/* ── BADGES ── */
 .demoPanel {
-  border-color: rgba(254,211,48,0.25) !important;
-  background: rgba(254,211,48,0.03) !important;
+  border-color: rgba(255,214,10,0.25) !important;
+  background: rgba(255,214,10,0.02) !important;
 }
 
 .demoBadge {
   font-size: 9px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--gold);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-align: center;
-  background: rgba(254,211,48,0.08);
-  border: 1px solid rgba(254,211,48,0.2);
+  background: rgba(255,214,10,0.08);
+  border: 1px solid rgba(255,214,10,0.2);
   border-radius: 5px;
   padding: 3px 8px;
-}
-
-.tabInactive {
-  flex: 1;
-  padding: 5px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  text-transform: uppercase;
-}
-
-.btnReset {
-  background: rgba(254,211,48,0.12);
-  color: var(--gold);
-  border: 1px solid rgba(254,211,48,0.3);
-}
-
-.btnReset:hover {
-  background: rgba(254,211,48,0.2);
+  font-family: 'Inter', sans-serif;
 }
 
 .guestBadge {
@@ -292,42 +252,12 @@
   border: 1px solid var(--border);
   border-radius: 5px;
   padding: 3px 8px;
-}
-
-.tabInactive {
-  flex: 1;
-  padding: 5px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--muted);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.demoPanel {
-  border-color: rgba(254,211,48,0.25) !important;
-  background: rgba(254,211,48,0.03) !important;
-}
-
-.demoBadge {
-  font-size: 9px;
-  font-weight: 800;
-  color: var(--gold);
-  letter-spacing: 0.08em;
-  text-align: center;
-  background: rgba(254,211,48,0.08);
-  border: 1px solid rgba(254,211,48,0.2);
-  border-radius: 5px;
-  padding: 3px 8px;
+  font-family: 'Inter', sans-serif;
 }
 
 .btnReset {
-  background: rgba(254,211,48,0.12);
+  background: rgba(255,214,10,0.1);
   color: var(--gold);
-  border: 1px solid rgba(254,211,48,0.3) !important;
+  border: 1px solid rgba(255,214,10,0.3);
 }
-.btnReset:hover { background: rgba(254,211,48,0.2); }
+.btnReset:hover { background: rgba(255,214,10,0.18); }
