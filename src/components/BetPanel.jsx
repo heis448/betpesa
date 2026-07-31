@@ -23,7 +23,6 @@ export default function BetPanel({ panel, requireAuth }) {
   }
 
   function handleMain() {
-    // ── DEMO MODE (no login needed) ──
     if (isDemo) {
       if (phase === 'waiting' && !placed) {
         if (demoBalance <= 0) { resetDemo(); return }
@@ -35,13 +34,13 @@ export default function BetPanel({ panel, requireAuth }) {
         updateBet(panel, { placed: false })
       } else if (phase === 'flying' && placed && !cashedOut && !cashing) {
         const payout = parseFloat((amount * multiplier).toFixed(2))
+        if (window.__betpesaCashout) window.__betpesaCashout(payout, multiplier)
         updateDemoBalance(payout)
-        updateBet(panel, { cashedOut: true, cashedAtMult: multiplier, cashing: false })
+        updateBet(panel, { cashedOut: true, cashedAtMult: multiplier })
       }
       return
     }
 
-    // ── LIVE MODE — require login ──
     if (!requireAuth()) return
 
     if (phase === 'waiting' && !placed) {
@@ -55,64 +54,54 @@ export default function BetPanel({ panel, requireAuth }) {
     }
   }
 
-  // ── Button label + class ──
   const demoEmpty = isDemo && demoBalance <= 0 && !placed
+  const livePayout = (amount * multiplier).toFixed(0)
   let btnLabel = '', btnClass = ''
 
   if (demoEmpty) {
     btnLabel = '🔄 Reset Demo'; btnClass = styles.btnReset
   } else if (phase === 'waiting') {
     if (!placed) {
-      btnLabel = isDemo
-        ? `Demo Bet KSh ${amount.toLocaleString()}`
-        : user
-          ? `Bet KSh ${amount.toLocaleString()}`
-          : `Login to Bet`
+      btnLabel = isDemo ? `BET  KSh ${amount.toLocaleString()}` : user ? `BET  KSh ${amount.toLocaleString()}` : 'LOGIN TO BET'
       btnClass = styles.btnBet
     } else {
-      btnLabel = `Cancel KSh ${amount.toLocaleString()}`
-      btnClass = styles.btnCancel
+      btnLabel = `CANCEL  KSh ${amount.toLocaleString()}`; btnClass = styles.btnCancel
     }
   } else if (phase === 'flying') {
-    if (!placed)        { btnLabel = 'Next Round';               btnClass = styles.btnIdle }
-    else if (cashedOut) { btnLabel = `✓ ${cashedAtMult?.toFixed(2)}×`; btnClass = styles.btnDone }
-    else if (cashing)   { btnLabel = 'Cashing...';               btnClass = styles.btnCash }
-    else                { btnLabel = `Cash Out`;                 btnClass = styles.btnCash }
+    if (!placed)        { btnLabel = 'NEXT ROUND';                              btnClass = styles.btnIdle }
+    else if (cashedOut) { btnLabel = `✓ CASHED  ${cashedAtMult?.toFixed(2)}×`; btnClass = styles.btnDone }
+    else if (cashing)   { btnLabel = 'CASHING OUT...';                          btnClass = styles.btnCash }
+    else                { btnLabel = `CASH OUT  KSh ${parseInt(livePayout).toLocaleString()}`; btnClass = styles.btnCash }
   } else if (phase === 'crashed') {
-    btnLabel = isDemo ? 'Demo Bet' : user ? 'Bet' : 'Login to Bet'
-    btnClass = styles.btnBet
+    btnLabel = isDemo ? 'BET' : user ? 'BET' : 'LOGIN TO BET'; btnClass = styles.btnBet
   }
 
   const disabled =
     !demoEmpty &&
-    ((phase === 'flying' && (!placed || cashedOut || cashing)) ||
-     phase === 'crashed')
+    ((phase === 'flying' && (!placed || cashedOut || cashing)) || phase === 'crashed')
 
   return (
     <div className={`${styles.panel} ${isDemo ? styles.demoPanel : ''}`}>
-      {/* Demo badge */}
+
+      {/* Demo balance badge */}
       {isDemo && (
         <div className={styles.demoBadge}>
-          🎮 DEMO • KSh {demoBalance.toLocaleString('en-KE', { minimumFractionDigits: 2 })}
+          🎮 DEMO &nbsp;·&nbsp; KSh {demoBalance.toLocaleString('en-KE', { minimumFractionDigits: 2 })}
         </div>
       )}
-
-      {/* Guest prompt for live mode */}
       {!isDemo && !user && (
-        <div className={styles.guestBadge}>
-          👤 Login to place real bets
-        </div>
+        <div className={styles.guestBadge}>👤 Login to place real bets</div>
       )}
 
-      {/* Tabs */}
+      {/* Panel tabs */}
       <div className={styles.tabs}>
         <button className={`${styles.tab} ${styles.tabActive}`}>
-          {isDemo ? `🎮 Demo` : `Bet ${panel}`}
+          {isDemo ? '🎮 Demo' : `Bet ${panel}`}
         </button>
         <button className={`${styles.tab} ${styles.tabInactive}`}>Auto</button>
       </div>
 
-      {/* Amount */}
+      {/* Amount row */}
       <div className={styles.amtRow}>
         <button className={styles.adj} onClick={() => setAmount(amount - 10)}>−</button>
         <div className={styles.amtWrap}>
