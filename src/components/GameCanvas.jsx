@@ -2,257 +2,323 @@ import { useEffect, useRef, useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import styles from './GameCanvas.module.css'
 
-// ── AUDIO ──
-function createAudio() {
-  let ctx = null
-  function g() {
-    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)()
-    return ctx
-  }
-  return {
-    fly() {
-      try {
-        const c = g(), o = c.createOscillator(), v = c.createGain()
-        o.connect(v); v.connect(c.destination)
-        o.type = 'sine'
-        o.frequency.setValueAtTime(180, c.currentTime)
-        o.frequency.exponentialRampToValueAtTime(600, c.currentTime + 0.4)
-        v.gain.setValueAtTime(0.07, c.currentTime)
-        v.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.45)
-        o.start(); o.stop(c.currentTime + 0.45)
-      } catch {}
-    },
-    cashout() {
-      try {
-        const c = g()
-        ;[0, 0.1, 0.2].forEach((d, i) => {
-          const o = c.createOscillator(), v = c.createGain()
-          o.connect(v); v.connect(c.destination)
-          o.type = 'sine'
-          o.frequency.value = [523, 659, 784][i]
-          v.gain.setValueAtTime(0.12, c.currentTime + d)
-          v.gain.exponentialRampToValueAtTime(0.001, c.currentTime + d + 0.3)
-          o.start(c.currentTime + d); o.stop(c.currentTime + d + 0.3)
-        })
-      } catch {}
-    },
-    crash() {
-      try {
-        const c = g(), o = c.createOscillator(), v = c.createGain()
-        o.connect(v); v.connect(c.destination)
-        o.type = 'sawtooth'
-        o.frequency.setValueAtTime(400, c.currentTime)
-        o.frequency.exponentialRampToValueAtTime(40, c.currentTime + 0.7)
-        v.gain.setValueAtTime(0.14, c.currentTime)
-        v.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.7)
-        o.start(); o.stop(c.currentTime + 0.7)
-      } catch {}
-    },
-    tick() {
-      try {
-        const c = g(), o = c.createOscillator(), v = c.createGain()
-        o.connect(v); v.connect(c.destination)
-        o.frequency.value = 1100
-        v.gain.setValueAtTime(0.035, c.currentTime)
-        v.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.04)
-        o.start(); o.stop(c.currentTime + 0.04)
-      } catch {}
-    },
-  }
+// ─────────────────────────────────────────────
+//  AUDIO  — Spribe-accurate
+//  • Rising: looping band-pass filtered white noise (jet engine hum)
+//            + slow pitch ramp as multiplier climbs
+//  • Flyaway: short sharp whoosh descending
+//  • Crash:   same whoosh but cut dead (no extra tone)
+//  • Cashout: bright upward 3-note ding (C5-E5-G5)
+//  • Tick:    soft high click every whole-number multiplier
+// ─────────────────────────────────────────────
+let _ctx = null
+function ac() {
+  if (!_ctx) _ctx = new (window.AudioContext || window.webkitAudioContext)()
+  if (_ctx.state === 'suspended') _ctx.resume()
+  return _ctx
 }
-const sfx = createAudio()
 
-// ── STARS ──
-function makeStars(n = 120) {
+// Persistent engine node refs
+let engineNodes = null
+
+function startEngine(mult = 1) {
+  try {
+    const c = ac()
+    stopEngine()
+
+    // White noise source
+    const bufSize = c.sampleRate * 2
+    const buf = c.createBuffer(1, bufSize, c.sampleRate)
+    const data = buf.getChannelData(0)
+    for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1
+    const src = c.createBufferSource()
+    src.buffer = buf
+    src.loop = true
+
+    // Band-pass filter — jet turbine character
+    const bp = c.createBiquadFilter()
+    bp.type = 'bandpass'
+    bp.frequency.value = 420
+    bp.Q.value = 0.9
+
+    // Low-pass to smooth it
+    const lp = c.createBiquadFilter()
+    lp.type = 'lowpass'
+    lp.frequency.value = 900
+
+    // Gain
+    const gain = c.createGain()
+    gain.gain.value = 0.18
+
+    src.connect(bp)
+    bp.connect(lp)
+    lp.connect(gain)
+    gain.connect(c.destination)
+    src.start()
+
+    engineNodes = { src, bp, lp, gain }
+  } catch (e) {}
+}
+
+function updateEngine(mult) {
+  if (!engineNodes) return
+  try {
+    const c = ac()
+    // Pitch rises subtly with multiplier (420 → 820 Hz over 1x→20x)
+    const freq = 420 + Math.min(mult - 1, 19) * 21
+    engineNodes.bp.frequency.setTargetAtTime(freq, c.currentTime, 0.4)
+    // Volume also nudges up
+    const vol = 0.18 + Math.min(mult - 1, 19) * 0.003
+    engineNodes.gain.gain.setTargetAtTime(vol, c.currentTime, 0.4)
+  } catch (e) {}
+}
+
+function stopEngine() {
+  if (!engineNodes) return
+  try { engineNodes.src.stop() } catch (e) {}
+  engineNodes = null
+}
+
+const sfx = {
+  cashout() {
+    try {
+      const c = ac()
+      // Spribe cashout: bright 3-note arpeggio C5-E5-G5
+      ;[[523.25, 0], [659.25, 0.11], [783.99, 0.22]].forEach(([freq, delay]) => {
+        const o = c.createOscillator()
+        const g = c.createGain()
+        o.connect(g); g.connect(c.destination)
+        o.type = 'sine'
+        o.frequency.value = freq
+        g.gain.setValueAtTime(0, c.currentTime + delay)
+        g.gain.linearRampToValueAtTime(0.18, c.currentTime + delay + 0.01)
+        g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + delay + 0.28)
+        o.start(c.currentTime + delay)
+        o.stop(c.currentTime + delay + 0.3)
+      })
+    } catch (e) {}
+  },
+
+  flyaway() {
+    try {
+      const c = ac()
+      stopEngine()
+      // Whoosh: descending filtered noise burst
+      const bufSize = c.sampleRate * 0.6
+      const buf = c.createBuffer(1, bufSize, c.sampleRate)
+      const data = buf.getChannelData(0)
+      for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1
+      const src = c.createBufferSource()
+      src.buffer = buf
+
+      const hp = c.createBiquadFilter()
+      hp.type = 'highpass'
+      hp.frequency.setValueAtTime(2200, c.currentTime)
+      hp.frequency.exponentialRampToValueAtTime(200, c.currentTime + 0.5)
+
+      const g = c.createGain()
+      g.gain.setValueAtTime(0.32, c.currentTime)
+      g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.55)
+
+      src.connect(hp); hp.connect(g); g.connect(c.destination)
+      src.start(); src.stop(c.currentTime + 0.6)
+    } catch (e) {}
+  },
+
+  tick() {
+    try {
+      const c = ac()
+      const o = c.createOscillator()
+      const g = c.createGain()
+      o.connect(g); g.connect(c.destination)
+      o.type = 'sine'
+      o.frequency.value = 1320
+      g.gain.setValueAtTime(0.04, c.currentTime)
+      g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.035)
+      o.start(); o.stop(c.currentTime + 0.04)
+    } catch (e) {}
+  },
+}
+
+// ─────────────────────────────────────────────
+//  STARS
+// ─────────────────────────────────────────────
+function makeStars(n = 140) {
   return Array.from({ length: n }, () => ({
     x: Math.random(), y: Math.random(),
-    r: Math.random() * 1.4 + 0.3,
-    o: Math.random() * 0.5 + 0.1,
-    speed: Math.random() * 0.0005 + 0.0001,
+    r: Math.random() * 1.2 + 0.2,
+    o: Math.random() * 0.55 + 0.08,
+    speed: Math.random() * 0.0004 + 0.00008,
     dir: Math.random() > 0.5 ? 1 : -1,
   }))
 }
 
-// ── CLOUDS ──
-function makeClouds(n = 8) {
-  return Array.from({ length: n }, (_, i) => ({
-    x: 0.1 + Math.random() * 0.9,
-    y: 0.1 + Math.random() * 0.75,
-    scale: 0.5 + Math.random() * 1.2,
-    opacity: 0,
-    speed: 0.00015 + Math.random() * 0.0001,
-    spawnMult: 1.5 + i * 1.8 + Math.random() * 1.5,
-    puffs: Array.from({ length: 4 + Math.floor(Math.random() * 3) }, () => ({
-      ox: (Math.random() - 0.5) * 80,
-      oy: (Math.random() - 0.5) * 25,
-      r:  20 + Math.random() * 28,
-    })),
-  }))
-}
-
-// ── DRAW SPRIBE-STYLE RED JET ──
-function drawPlane(ctx, x, y, angle) {
+// ─────────────────────────────────────────────
+//  DRAW PLANE — Spribe-accurate simple cartoon red jet
+//  Small, flat, bold — matches screenshots exactly
+//  Origin = center of body, faces right (+x)
+// ─────────────────────────────────────────────
+function drawPlane(ctx, x, y, angle, scale = 1) {
   ctx.save()
   ctx.translate(x, y)
   ctx.rotate(angle)
+  ctx.scale(scale, scale)
 
-  // Long fire exhaust trail
-  for (let i = 6; i >= 0; i--) {
-    const ex = -(30 + i * 16)
-    const spread = i * 1.4
-    const alpha = (0.7 - i * 0.09)
-    const radius = 10 - i * 0.9
-    const colors = [
-      `rgba(255,255,200,${alpha})`,
-      `rgba(255,220,80,${alpha})`,
-      `rgba(255,140,20,${alpha * 0.85})`,
-      `rgba(255,60,0,${alpha * 0.7})`,
-      `rgba(200,20,0,${alpha * 0.5})`,
-      `rgba(120,10,0,${alpha * 0.3})`,
-      `rgba(60,10,0,${alpha * 0.15})`,
-    ]
-    ctx.beginPath()
-    ctx.arc(ex, (Math.random() - 0.5) * spread, Math.max(1, radius), 0, Math.PI * 2)
-    ctx.fillStyle = colors[i]
-    ctx.fill()
-  }
+  const RED  = '#e8192c'
+  const DKRD = '#9a0f1e'
 
-  // Glow aura around plane
-  const glow = ctx.createRadialGradient(0, 0, 4, 0, 0, 50)
-  glow.addColorStop(0, 'rgba(255,100,50,0.18)')
-  glow.addColorStop(1, 'rgba(255,100,50,0)')
-  ctx.fillStyle = glow
-  ctx.beginPath(); ctx.arc(0, 0, 50, 0, Math.PI * 2); ctx.fill()
+  // ── FLAME / EXHAUST — small warm glow behind tail ──
+  const flame = ctx.createRadialGradient(-36, 0, 0, -36, 0, 12)
+  flame.addColorStop(0,   'rgba(255,200,50,0.9)')
+  flame.addColorStop(0.45,'rgba(255,90,10,0.65)')
+  flame.addColorStop(1,   'rgba(255,40,0,0)')
+  ctx.fillStyle = flame
+  ctx.beginPath(); ctx.ellipse(-36, 0, 12, 5, 0, 0, Math.PI * 2); ctx.fill()
 
-  // Shadow/depth under fuselage
-  ctx.fillStyle = 'rgba(0,0,0,0.25)'
+  // ── FUSELAGE — simple fat torpedo ──
+  ctx.fillStyle = RED
   ctx.beginPath()
-  ctx.ellipse(0, 6, 26, 5, 0, 0, Math.PI * 2)
+  ctx.moveTo(26, 0)
+  ctx.bezierCurveTo(18, -5, -8, -6, -26, -3)
+  ctx.lineTo(-36, 0)
+  ctx.lineTo(-26,  3)
+  ctx.bezierCurveTo(-8,  6, 18,  5, 26, 0)
+  ctx.closePath()
+  ctx.fill()
+  // slight top sheen
+  ctx.fillStyle = 'rgba(255,100,100,0.18)'
+  ctx.beginPath()
+  ctx.moveTo(20, -1)
+  ctx.bezierCurveTo(10, -5, -8, -5.5, -24, -2)
+  ctx.lineTo(-24, -3)
+  ctx.bezierCurveTo(-8, -6, 10, -5, 20, 0)
+  ctx.closePath()
   ctx.fill()
 
-  // Main fuselage — red body
-  const bodyGrad = ctx.createLinearGradient(0, -8, 0, 8)
-  bodyGrad.addColorStop(0, '#ff5533')
-  bodyGrad.addColorStop(0.4, '#cc2200')
-  bodyGrad.addColorStop(1, '#881100')
-  ctx.fillStyle = bodyGrad
-  ctx.beginPath()
-  ctx.moveTo(32, 0)
-  ctx.bezierCurveTo(24, -6, -14, -7, -24, -3)
-  ctx.lineTo(-26, 0)
-  ctx.lineTo(-24, 3)
-  ctx.bezierCurveTo(-14, 7, 24, 6, 32, 0)
-  ctx.fill()
+  // ── COCKPIT — small dark dome ──
+  ctx.fillStyle = 'rgba(20,50,110,0.9)'
+  ctx.beginPath(); ctx.ellipse(10, -2.5, 6, 3, -0.15, 0, Math.PI * 2); ctx.fill()
+  ctx.fillStyle = 'rgba(255,255,255,0.45)'
+  ctx.beginPath(); ctx.ellipse(12, -3.8, 2, 1, -0.2, 0, Math.PI * 2); ctx.fill()
 
-  // Fuselage highlight stripe
-  ctx.strokeStyle = 'rgba(255,150,120,0.5)'
-  ctx.lineWidth = 1.5
-  ctx.beginPath()
-  ctx.moveTo(28, -2)
-  ctx.bezierCurveTo(18, -5, -10, -5, -22, -2)
-  ctx.stroke()
-
-  // Nose cone — pointed
-  const noseGrad = ctx.createLinearGradient(28, 0, 42, 0)
-  noseGrad.addColorStop(0, '#ff6644')
-  noseGrad.addColorStop(1, '#ffddcc')
-  ctx.fillStyle = noseGrad
-  ctx.beginPath()
-  ctx.moveTo(28, -4); ctx.lineTo(44, 0); ctx.lineTo(28, 4); ctx.closePath()
-  ctx.fill()
-
-  // Cockpit
-  const cockpitGrad = ctx.createRadialGradient(18, -4, 1, 16, -3, 9)
-  cockpitGrad.addColorStop(0, 'rgba(180,230,255,0.9)')
-  cockpitGrad.addColorStop(0.5, 'rgba(80,160,220,0.7)')
-  cockpitGrad.addColorStop(1, 'rgba(20,60,120,0.5)')
-  ctx.fillStyle = cockpitGrad
-  ctx.beginPath(); ctx.ellipse(16, -3, 7, 4, -0.2, 0, Math.PI * 2); ctx.fill()
-  // cockpit glint
-  ctx.fillStyle = 'rgba(255,255,255,0.7)'
-  ctx.beginPath(); ctx.ellipse(18, -5, 2.5, 1.5, -0.3, 0, Math.PI * 2); ctx.fill()
-
-  // Main wings — swept delta
-  const wingGrad = ctx.createLinearGradient(0, 0, 0, -32)
-  wingGrad.addColorStop(0, '#dd2200')
-  wingGrad.addColorStop(1, '#881100')
-  ctx.fillStyle = wingGrad
+  // ── MAIN WINGS — swept back, both sides ──
+  ctx.fillStyle = RED
   // top wing
   ctx.beginPath()
-  ctx.moveTo(10, -5); ctx.lineTo(-2, -34); ctx.lineTo(-14, -28); ctx.lineTo(-6, -5)
+  ctx.moveTo(6, -4); ctx.lineTo(-8, -26); ctx.lineTo(-17, -20); ctx.lineTo(-3, -4)
   ctx.closePath(); ctx.fill()
-  // top wing highlight
-  ctx.strokeStyle = 'rgba(255,120,80,0.4)'; ctx.lineWidth = 1
-  ctx.beginPath(); ctx.moveTo(8, -6); ctx.lineTo(-2, -30); ctx.stroke()
-
   // bottom wing
-  ctx.fillStyle = wingGrad
+  ctx.fillStyle = DKRD
   ctx.beginPath()
-  ctx.moveTo(10, 5); ctx.lineTo(-2, 34); ctx.lineTo(-14, 28); ctx.lineTo(-6, 5)
+  ctx.moveTo(6,  4); ctx.lineTo(-8,  26); ctx.lineTo(-17, 20); ctx.lineTo(-3,  4)
   ctx.closePath(); ctx.fill()
 
-  // Wing tip lights
-  ctx.fillStyle = '#fff'
-  ctx.shadowColor = '#fff'; ctx.shadowBlur = 6
-  ctx.beginPath(); ctx.arc(-3, -34, 2, 0, Math.PI*2); ctx.fill()
-  ctx.beginPath(); ctx.arc(-3,  34, 2, 0, Math.PI*2); ctx.fill()
-  ctx.shadowBlur = 0
-
-  // Tail vertical fin
-  const tailGrad = ctx.createLinearGradient(-14, 0, -14, -20)
-  tailGrad.addColorStop(0, '#cc2200'); tailGrad.addColorStop(1, '#ff4422')
-  ctx.fillStyle = tailGrad
+  // ── TAIL FIN — upward ──
+  ctx.fillStyle = RED
   ctx.beginPath()
-  ctx.moveTo(-16, -4); ctx.lineTo(-24, -20); ctx.lineTo(-20, -20); ctx.lineTo(-14, -4)
+  ctx.moveTo(-18, -3); ctx.lineTo(-26, -15); ctx.lineTo(-22, -3)
   ctx.closePath(); ctx.fill()
 
-  // Horizontal stabilisers
-  ctx.fillStyle = '#bb1100'
+  // ── HORIZONTAL STABS ──
+  ctx.fillStyle = DKRD
   ctx.beginPath()
-  ctx.moveTo(-18, -3); ctx.lineTo(-28, -12); ctx.lineTo(-26, -3); ctx.closePath(); ctx.fill()
+  ctx.moveTo(-20, -2); ctx.lineTo(-28, -8); ctx.lineTo(-25, -2); ctx.closePath(); ctx.fill()
   ctx.beginPath()
-  ctx.moveTo(-18,  3); ctx.lineTo(-28,  12); ctx.lineTo(-26,  3); ctx.closePath(); ctx.fill()
-
-  // Engine nacelles
-  const nacGrad = ctx.createLinearGradient(0, -16, 0, -10)
-  nacGrad.addColorStop(0, '#993300'); nacGrad.addColorStop(1, '#551100')
-  ctx.fillStyle = nacGrad
-  ctx.beginPath(); ctx.ellipse(-2, -16, 6, 3, -0.3, 0, Math.PI*2); ctx.fill()
-  ctx.beginPath(); ctx.ellipse(-2,  16, 6, 3,  0.3, 0, Math.PI*2); ctx.fill()
-
-  // Engine glow
-  ctx.fillStyle = '#ffaa00'
-  ctx.shadowColor = '#ffaa00'; ctx.shadowBlur = 14
-  ctx.beginPath(); ctx.arc(-20, 0, 3.5, 0, Math.PI*2); ctx.fill()
-  ctx.shadowBlur = 0
+  ctx.moveTo(-20,  2); ctx.lineTo(-28,  8); ctx.lineTo(-25,  2); ctx.closePath(); ctx.fill()
 
   ctx.restore()
 }
 
-// ── DRAW CLOUD ──
-function drawCloud(ctx, cx, cy, scale, opacity, puffs) {
-  if (opacity <= 0) return
-  ctx.save()
-  ctx.globalAlpha = opacity
-  ctx.translate(cx, cy)
-  ctx.scale(scale, scale * 0.65)
-  puffs.forEach(p => {
-    const cg = ctx.createRadialGradient(p.ox, p.oy, 0, p.ox, p.oy, p.r)
-    cg.addColorStop(0, 'rgba(255,255,255,0.55)')
-    cg.addColorStop(0.5, 'rgba(220,230,255,0.28)')
-    cg.addColorStop(1, 'rgba(180,200,255,0)')
-    ctx.fillStyle = cg
-    ctx.beginPath(); ctx.arc(p.ox, p.oy, p.r, 0, Math.PI*2); ctx.fill()
-  })
-  ctx.restore()
+// ─────────────────────────────────────────────
+//  DRAW CURVE — Spribe-accurate red line + fill
+// ─────────────────────────────────────────────
+function drawCurve(ctx, W, H, points, currentMult, isCrashed) {
+  if (points.length < 2) return
+
+  const pad = { left: 52, bottom: 36, right: 20, top: 20 }
+  const pw  = W - pad.left - pad.right
+  const ph  = H - pad.top  - pad.bottom
+  const maxT = Math.max(points[points.length - 1]?.t || 1, 1)
+  const maxM  = Math.max(currentMult * 1.35, 2)
+
+  function toS(t, m) {
+    return {
+      x: pad.left + (t / maxT) * pw,
+      y: H - pad.bottom - ((m - 1) / (maxM - 1)) * ph,
+    }
+  }
+
+  // ── Spribe uses RED for the curve, always ──
+  const lineColor = isCrashed ? '#f23645' : '#f23645'
+  const glowColor = isCrashed ? 'rgba(242,54,69,0.18)' : 'rgba(242,54,69,0.18)'
+  const fillTop   = isCrashed ? 'rgba(242,54,69,0.08)' : 'rgba(242,54,69,0.08)'
+
+  // fill under curve
+  ctx.beginPath()
+  const p0 = toS(points[0].t, points[0].m)
+  ctx.moveTo(p0.x, H - pad.bottom)
+  ctx.lineTo(p0.x, p0.y)
+  for (let i = 1; i < points.length; i++) {
+    const p = toS(points[i].t, points[i].m)
+    ctx.lineTo(p.x, p.y)
+  }
+  const last = toS(points[points.length - 1].t, points[points.length - 1].m)
+  ctx.lineTo(last.x, H - pad.bottom)
+  ctx.closePath()
+  const fillGrad = ctx.createLinearGradient(0, pad.top, 0, H - pad.bottom)
+  fillGrad.addColorStop(0, fillTop)
+  fillGrad.addColorStop(1, 'rgba(242,54,69,0.01)')
+  ctx.fillStyle = fillGrad; ctx.fill()
+
+  // glow pass
+  ctx.beginPath()
+  const g0 = toS(points[0].t, points[0].m); ctx.moveTo(g0.x, g0.y)
+  for (let i = 1; i < points.length; i++) {
+    const p = toS(points[i].t, points[i].m); ctx.lineTo(p.x, p.y)
+  }
+  ctx.strokeStyle = glowColor
+  ctx.lineWidth = 10
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke()
+
+  // main line
+  ctx.beginPath()
+  const l0 = toS(points[0].t, points[0].m); ctx.moveTo(l0.x, l0.y)
+  for (let i = 1; i < points.length; i++) {
+    const p = toS(points[i].t, points[i].m); ctx.lineTo(p.x, p.y)
+  }
+  ctx.strokeStyle = lineColor
+  ctx.lineWidth = 2.5
+  ctx.shadowColor = lineColor; ctx.shadowBlur = 8
+  ctx.stroke(); ctx.shadowBlur = 0
+
+  // Y-axis labels
+  ctx.fillStyle = 'rgba(255,255,255,0.18)'
+  ctx.font = '10px "Roboto Mono", monospace'
+  ctx.textAlign = 'right'
+  const step = Math.ceil(maxM / 5)
+  for (let m = 1; m <= Math.ceil(maxM); m += step) {
+    const py = toS(0, m).y
+    if (py > pad.top + 4 && py < H - pad.bottom - 4)
+      ctx.fillText(m + '×', pad.left - 6, py + 4)
+  }
+
+  // plane at tip (only when flying)
+  if (!isCrashed && points.length >= 2) {
+    const tip  = toS(points[points.length - 1].t, points[points.length - 1].m)
+    const prev = toS(points[points.length - 2].t, points[points.length - 2].m)
+    const angle = Math.atan2(tip.y - prev.y, tip.x - prev.x)
+    const planeScale = Math.min(W, H) / 480  // responsive scale
+    drawPlane(ctx, tip.x, tip.y, angle, planeScale)
+  }
 }
 
-// ── DRAW GRID ──
-function drawGrid(ctx, W, H, mult) {
-  const pad = { left: 48, bottom: 32, right: 16, top: 16 }
-  const alpha = Math.max(0.015, 0.06 - (mult - 1) * 0.003)
+// ─────────────────────────────────────────────
+//  GRID
+// ─────────────────────────────────────────────
+function drawGrid(ctx, W, H) {
+  const pad = { left: 52, bottom: 36, right: 20, top: 20 }
   ctx.save()
-  ctx.strokeStyle = `rgba(255,255,255,${alpha})`
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)'
   ctx.lineWidth = 1
   const rows = 5, cols = 8
   for (let i = 0; i <= rows; i++) {
@@ -266,76 +332,9 @@ function drawGrid(ctx, W, H, mult) {
   ctx.restore()
 }
 
-// ── DRAW CURVE ──
-function drawCurve(ctx, W, H, points, currentMult, isCrashed) {
-  if (points.length < 2) return
-  const pad  = { left: 48, bottom: 32, right: 16, top: 16 }
-  const pw   = W - pad.left - pad.right
-  const ph   = H - pad.top - pad.bottom
-  const maxT = Math.max(points[points.length-1]?.t || 1, 1)
-  const maxM = Math.max(currentMult * 1.35, 2)
-
-  function toS(t, m) {
-    return {
-      x: pad.left + (t / maxT) * pw,
-      y: H - pad.bottom - ((m - 1) / (maxM - 1)) * ph,
-    }
-  }
-
-  const mc = isCrashed ? '#f23645' : '#00e5a0'
-  const gc = isCrashed ? 'rgba(242,54,69,' : 'rgba(0,229,160,'
-
-  // Fill under curve
-  ctx.beginPath()
-  const p0 = toS(points[0].t, points[0].m)
-  ctx.moveTo(p0.x, H - pad.bottom); ctx.lineTo(p0.x, p0.y)
-  for (let i = 1; i < points.length; i++) {
-    const p = toS(points[i].t, points[i].m); ctx.lineTo(p.x, p.y)
-  }
-  const last = toS(points[points.length-1].t, points[points.length-1].m)
-  ctx.lineTo(last.x, H - pad.bottom); ctx.closePath()
-  const grad = ctx.createLinearGradient(0, pad.top, 0, H - pad.bottom)
-  grad.addColorStop(0, gc + '0.15)'); grad.addColorStop(1, gc + '0.01)')
-  ctx.fillStyle = grad; ctx.fill()
-
-  // Glow line
-  ctx.beginPath()
-  const g0 = toS(points[0].t, points[0].m); ctx.moveTo(g0.x, g0.y)
-  for (let i = 1; i < points.length; i++) {
-    const p = toS(points[i].t, points[i].m); ctx.lineTo(p.x, p.y)
-  }
-  ctx.strokeStyle = gc + '0.2)'; ctx.lineWidth = 10
-  ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke()
-
-  // Main line
-  ctx.beginPath()
-  const l0 = toS(points[0].t, points[0].m); ctx.moveTo(l0.x, l0.y)
-  for (let i = 1; i < points.length; i++) {
-    const p = toS(points[i].t, points[i].m); ctx.lineTo(p.x, p.y)
-  }
-  ctx.strokeStyle = mc; ctx.lineWidth = 2.5
-  ctx.shadowColor = mc; ctx.shadowBlur = 8; ctx.stroke(); ctx.shadowBlur = 0
-
-  // Y-axis labels
-  ctx.fillStyle = 'rgba(255,255,255,0.22)'
-  ctx.font = '10px Roboto Mono, monospace'; ctx.textAlign = 'right'
-  const step = Math.ceil(maxM / 5)
-  for (let m = 1; m <= Math.ceil(maxM); m += step) {
-    const py = toS(0, m).y
-    if (py > pad.top + 4 && py < H - pad.bottom - 4)
-      ctx.fillText(m + '×', pad.left - 6, py + 4)
-  }
-
-  // Plane at tip
-  if (!isCrashed && points.length >= 2) {
-    const tip  = toS(points[points.length-1].t, points[points.length-1].m)
-    const prev = toS(points[points.length-2].t, points[points.length-2].m)
-    const angle = Math.atan2(tip.y - prev.y, tip.x - prev.x)
-    drawPlane(ctx, tip.x, tip.y, angle)
-  }
-}
-
-// ── CASHOUT POPUP ──
+// ─────────────────────────────────────────────
+//  CASHOUT POPUP — Spribe style
+// ─────────────────────────────────────────────
 function CashoutPopup({ payout, mult, onDone }) {
   useEffect(() => { const t = setTimeout(onDone, 2600); return () => clearTimeout(t) }, [])
   return (
@@ -351,43 +350,138 @@ function CashoutPopup({ payout, mult, onDone }) {
   )
 }
 
-// ── LOADING SCREEN ──
-function LoadingIntro({ onDone }) {
-  useEffect(() => { const t = setTimeout(onDone, 2400); return () => clearTimeout(t) }, [])
+// ─────────────────────────────────────────────
+//  FLYBY CANVAS — renders the actual plane flying
+//  across the bottom during waiting phase
+// ─────────────────────────────────────────────
+function FlybyCanvas() {
+  const ref = useRef(null)
+  const progRef = useRef(0)
+  const animRef = useRef(null)
+
+  useEffect(() => {
+    const canvas = ref.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+
+    function resize() {
+      canvas.width  = canvas.offsetWidth
+      canvas.height = canvas.offsetHeight
+    }
+    resize()
+    const ro = new ResizeObserver(resize)
+    ro.observe(canvas)
+
+    const SPEED = 0.0028   // fraction of width per frame
+    progRef.current = -0.12 // start offscreen left
+
+    function draw() {
+      const W = canvas.width, H = canvas.height
+      ctx.clearRect(0, 0, W, H)
+
+      progRef.current += SPEED
+      if (progRef.current > 1.12) progRef.current = -0.12
+
+      const px = progRef.current * W
+      const py = H * 0.55
+      const scale = Math.min(W, H) / 220  // smaller than in-game
+
+      // fade near edges
+      const edge = W * 0.08
+      let alpha = 1
+      if (px < edge)       alpha = Math.max(0, px / edge)
+      if (px > W - edge)   alpha = Math.max(0, (W - px) / edge)
+      ctx.globalAlpha = alpha
+
+      drawPlane(ctx, px, py, 0, scale)
+      ctx.globalAlpha = 1
+
+      animRef.current = requestAnimationFrame(draw)
+    }
+
+    animRef.current = requestAnimationFrame(draw)
+    return () => { cancelAnimationFrame(animRef.current); ro.disconnect() }
+  }, [])
+
+  return <canvas ref={ref} className={styles.flybyCanvas} />
+}
+
+// ─────────────────────────────────────────────
+//  WAITING SPLASH — Spribe/UFC style
+//  Aviator branding center + SPRIBE badge
+//  Plane flyby at bottom using actual canvas plane
+//  Countdown fades in last 3 seconds
+// ─────────────────────────────────────────────
+function WaitingSplash({ countdown }) {
+  const showCountdown = countdown <= 3
+
   return (
-    <div className={styles.loadingScreen}>
-      <div className={styles.loadingBg} />
-      <div className={styles.loadingContent}>
-        <div className={styles.loadingPlaneWrap}>
-          <span className={styles.loadingPlaneShadow} />
-          <span className={styles.loadingPlane}>✈</span>
+    <div className={styles.waitOverlay}>
+
+      {/* ── CENTER: Aviator brand + SPRIBE badge ── */}
+      <div className={styles.splashCenter}>
+
+        {/* Aviator wordmark with plane icon — mirrors Spribe's own brand block */}
+        <div className={styles.splashAviatorRow}>
+          <svg className={styles.splashSvgPlane} viewBox="0 0 60 36" fill="none">
+            {/* mini plane silhouette in red */}
+            <path d="M52 18 C44 13 18 12 4 15 L0 18 L4 21 C18 24 44 23 52 18Z" fill="#e8192c"/>
+            <path d="M30 16 L22 2 L14 6 L24 16Z" fill="#e8192c"/>
+            <path d="M30 20 L22 34 L14 30 L24 20Z" fill="#9a0f1e"/>
+            <path d="M6 17 L0 12 L4 17Z" fill="#9a0f1e"/>
+            <path d="M6 19 L0 24 L4 19Z" fill="#9a0f1e"/>
+            <ellipse cx="40" cy="15" rx="7" ry="3.5" fill="rgba(20,50,110,0.85)"/>
+          </svg>
+          <span className={styles.splashAviatorText}>Aviator</span>
         </div>
-        <div className={styles.loadingLogo}>
-          <span className={styles.loadingLogoText}>BetPesa</span>
-          <span className={styles.loadingLogoSub}>AVIATOR</span>
+
+        <div className={styles.splashTagline}>POWERED BY</div>
+
+        {/* SPRIBE badge — green border, exact Spribe style */}
+        <div className={styles.splashBadge}>
+          <div className={styles.splashBadgeLeft}>
+            <div className={styles.splashSpribeS}>S</div>
+          </div>
+          <div className={styles.splashBadgeRight}>
+            <div className={styles.splashBadgeName}>SPRIBE</div>
+            <div className={styles.splashBadgeSub}>Official Game ✓ &nbsp;Since 2019</div>
+          </div>
         </div>
-        <div className={styles.loadingBar}>
-          <div className={styles.loadingFill} />
-        </div>
-        <div className={styles.loadingHint}>Connecting to server…</div>
+
       </div>
+
+      {/* ── COUNTDOWN — fades in at last 3s ── */}
+      <div className={`${styles.splashCountdown} ${showCountdown ? styles.splashCountdownVisible : ''}`}>
+        <div className={styles.waitSub}>STARTING IN</div>
+        <div className={styles.waitCount}>{countdown}s</div>
+        <div className={styles.waitBar}>
+          <div className={styles.waitFill} style={{ width: `${((5 - countdown) / 5) * 100}%` }} />
+        </div>
+        <div className={styles.waitHint}>Place your bets!</div>
+      </div>
+
+      {/* ── PLANE FLYBY — actual canvas plane ── */}
+      <div className={styles.flybyTrack}>
+        <FlybyCanvas />
+      </div>
+
     </div>
   )
 }
 
-// ── MAIN ──
+// ─────────────────────────────────────────────
+//  MAIN
+// ─────────────────────────────────────────────
 export default function GameCanvas() {
-  const canvasRef   = useRef(null)
-  const pointsRef   = useRef([])
-  const startRef    = useRef(null)
-  const animRef     = useRef(null)
-  const starsRef    = useRef(makeStars())
-  const cloudsRef   = useRef(makeClouds())
-  const prevPhase   = useRef(null)
-  const prevMult    = useRef(1)
+  const canvasRef  = useRef(null)
+  const pointsRef  = useRef([])
+  const startRef   = useRef(null)
+  const animRef    = useRef(null)
+  const starsRef   = useRef(makeStars())
+  const prevPhase  = useRef(null)
+  const prevMult   = useRef(1)
 
-  const [showIntro, setShowIntro] = useState(true)
-  const [cashouts,  setCashouts]  = useState([])
+  const [cashouts, setCashouts] = useState([])
 
   const phase      = useGameStore(s => s.phase)
   const mode       = useGameStore(s => s.mode)
@@ -412,19 +506,25 @@ export default function GameCanvas() {
   useEffect(() => {
     if (phase === prevPhase.current) return
     if (phase === 'waiting') {
+      stopEngine()
       pointsRef.current = []
       startRef.current  = null
-      cloudsRef.current = makeClouds()
       prevMult.current  = 1
     }
-    if (phase === 'flying') { sfx.fly(); startRef.current = Date.now() }
-    if (phase === 'crashed') sfx.crash()
+    if (phase === 'flying') {
+      startEngine(1)
+      startRef.current = Date.now()
+    }
+    if (phase === 'crashed') {
+      sfx.flyaway()
+    }
     prevPhase.current = phase
   }, [phase])
 
-  // Tick sound
+  // Engine pitch update + tick sound
   useEffect(() => {
     if (phase !== 'flying') return
+    updateEngine(multiplier)
     if (Math.floor(multiplier) > Math.floor(prevMult.current)) sfx.tick()
     prevMult.current = multiplier
   }, [multiplier, phase])
@@ -449,7 +549,10 @@ export default function GameCanvas() {
     if (!canvas) return
     const ctx = canvas.getContext('2d')
 
-    function resize() { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight }
+    function resize() {
+      canvas.width  = canvas.offsetWidth
+      canvas.height = canvas.offsetHeight
+    }
     resize()
     const ro = new ResizeObserver(resize)
     ro.observe(canvas)
@@ -460,57 +563,42 @@ export default function GameCanvas() {
 
       ctx.clearRect(0, 0, W, H)
 
-      // ── BACKGROUND — shifts from dark night to dusk/blue as mult rises ──
-      const skyPct = Math.min((mult - 1) / 15, 1)   // 0 at 1x → 1 at 15x+
-      const r0 = Math.round(8  + skyPct * 10)
-      const g0 = Math.round(10 + skyPct * 18)
-      const b0 = Math.round(22 + skyPct * 40)
-      const bg = ctx.createRadialGradient(W * 0.15, H * 0.85, 0, W * 0.5, H * 0.5, W)
-      bg.addColorStop(0, `rgb(${r0+8},${g0+14},${b0+20})`)
-      bg.addColorStop(0.6, `rgb(${r0},${g0},${b0})`)
-      bg.addColorStop(1, `rgb(${Math.max(4,r0-4)},${Math.max(6,g0-4)},${Math.max(14,b0-6)})`)
-      ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H)
+      // ── BACKGROUND — Spribe: flat very dark navy, no colour shift ──
+      ctx.fillStyle = '#0b0e1a'
+      ctx.fillRect(0, 0, W, H)
 
-      // ── STARS — fade out as mult rises (clouds replace them) ──
-      const starAlpha = Math.max(0, 1 - (mult - 1) / 8)
-      if (starAlpha > 0) {
-        starsRef.current.forEach(s => {
-          s.o += s.speed * s.dir
-          if (s.o > 0.55 || s.o < 0.05) s.dir *= -1
-          ctx.beginPath()
-          ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2)
-          ctx.fillStyle = `rgba(200,215,255,${s.o * starAlpha})`
-          ctx.fill()
-        })
-      }
+      // subtle radial vignette
+      const vig = ctx.createRadialGradient(W * 0.5, H * 0.5, 0, W * 0.5, H * 0.5, W * 0.75)
+      vig.addColorStop(0, 'rgba(0,0,0,0)')
+      vig.addColorStop(1, 'rgba(0,0,0,0.35)')
+      ctx.fillStyle = vig; ctx.fillRect(0, 0, W, H)
 
-      // ── CLOUDS — appear & drift as mult increases ──
-      cloudsRef.current.forEach(cloud => {
-        // Fade in when mult passes their spawn point
-        const targetOpacity = mult >= cloud.spawnMult
-          ? Math.min(0.75, (mult - cloud.spawnMult) / 2)
-          : 0
-        cloud.opacity += (targetOpacity - cloud.opacity) * 0.04
-        // Drift left slowly
-        if (cloud.opacity > 0.01) cloud.x -= cloud.speed
-        if (cloud.x < -0.3) cloud.x = 1.2
-        drawCloud(ctx, cloud.x * W, cloud.y * H, cloud.scale, cloud.opacity, cloud.puffs)
+      // ── STARS — always visible (Spribe keeps them throughout) ──
+      starsRef.current.forEach(s => {
+        s.o += s.speed * s.dir
+        if (s.o > 0.55 || s.o < 0.05) s.dir *= -1
+        ctx.beginPath()
+        ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(200,215,255,${s.o})`
+        ctx.fill()
       })
 
-      // Crash red flash
+      // crash red flash overlay
       if (phase === 'crashed') {
-        const flash = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W * 0.7)
-        flash.addColorStop(0, 'rgba(242,54,69,0.12)')
+        const flash = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W * 0.65)
+        flash.addColorStop(0, 'rgba(242,54,69,0.10)')
         flash.addColorStop(1, 'rgba(0,0,0,0)')
         ctx.fillStyle = flash; ctx.fillRect(0, 0, W, H)
       }
 
-      drawGrid(ctx, W, H, mult)
+      drawGrid(ctx, W, H)
 
       if ((phase === 'flying' || phase === 'crashed') && startRef.current) {
         if (phase === 'flying') {
           const elapsed = (Date.now() - startRef.current) / 1000
           pointsRef.current.push({ t: elapsed, m: Math.pow(Math.E, elapsed * 0.65) })
+          // cap buffer
+          if (pointsRef.current.length > 800) pointsRef.current = pointsRef.current.slice(-600)
         }
         if (pointsRef.current.length > 1)
           drawCurve(ctx, W, H, pointsRef.current, multiplier, phase === 'crashed')
@@ -529,43 +617,27 @@ export default function GameCanvas() {
 
   return (
     <div className={styles.wrap}>
-      {showIntro && <LoadingIntro onDone={() => setShowIntro(false)} />}
-
       <canvas ref={canvasRef} className={styles.canvas} />
 
-      {/* MULTIPLIER — left aligned, Spribe style */}
+      {/* ── MULTIPLIER — Spribe: white, left-center, no subtitle ── */}
       {flying && (
         <div className={styles.multOverlay}>
           <div className={styles.multValue}>{multiplier.toFixed(2)}×</div>
-          <div className={styles.multSub}>✈ FLYING</div>
         </div>
       )}
 
-      {/* CRASH — single overlay, no duplicate */}
+      {/* ── CRASH — "Flew Away!" in red, multiplier in white below ── */}
       {crashed && (
         <div className={styles.crashOverlay}>
-          <div className={styles.crashEmoji}>💥</div>
           <div className={styles.crashLabel}>FLEW AWAY!</div>
           <div className={styles.crashMult}>{crashAt?.toFixed(2)}×</div>
         </div>
       )}
 
-      {/* WAITING */}
-      {waiting && (
-        <div className={styles.waitOverlay}>
-          <div className={styles.waitInner}>
-            <div className={styles.waitPlane}>✈</div>
-            <div className={styles.waitTitle}>PLACING BETS</div>
-            <div className={styles.waitSub}>Next flight in</div>
-            <div className={styles.waitCount}>{countdown}s</div>
-            <div className={styles.waitBar}>
-              <div className={styles.waitFill} style={{ width: `${Math.max(0,((5-countdown)/5))*100}%` }} />
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── WAITING — branded splash + flyby + countdown ── */}
+      {waiting && <WaitingSplash countdown={countdown} />}
 
-      {/* CASHOUT POPUPS */}
+      {/* ── CASHOUT POPUPS ── */}
       {cashouts.map(c => (
         <CashoutPopup
           key={c.id} payout={c.payout} mult={c.mult}
