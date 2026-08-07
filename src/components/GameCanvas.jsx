@@ -230,30 +230,35 @@ function drawPlane(ctx, x, y, angle, scale = 1) {
 }
 
 // ─────────────────────────────────────────────
-//  DRAW CURVE — Spribe-accurate red line + fill
+//  DRAW CURVE — Spribe-accurate
+//  • Curve always fills canvas width (X auto-scales to elapsed time)
+//  • Y axis scales so tip is always 75-85% up from bottom — never clips
+//  • Plane always fully visible: clamped 40px from all edges
+//  • Spribe red line + translucent fill + glow
 // ─────────────────────────────────────────────
 function drawCurve(ctx, W, H, points, currentMult, isCrashed) {
   if (points.length < 2) return
 
-  const pad = { left: 52, bottom: 36, right: 20, top: 20 }
-  const pw  = W - pad.left - pad.right
-  const ph  = H - pad.top  - pad.bottom
+  const pad = { left: 44, bottom: 32, right: 56, top: 32 }
+  const pw = W - pad.left - pad.right
+  const ph = H - pad.top  - pad.bottom
+
   const maxT = Math.max(points[points.length - 1]?.t || 1, 1)
-  const maxM  = Math.max(currentMult * 1.35, 2)
+
+  // ── KEY FIX: Y axis always keeps tip at 78% height, never clips ──
+  // maxM is whatever keeps the current tip at 78% of the plot height
+  // so the curve always fills the canvas nicely like Spribe
+  const tipM  = currentMult
+  const maxM  = Math.max(tipM / 0.78, 2)   // tip stays at 78% up
 
   function toS(t, m) {
-    return {
-      x: pad.left + (t / maxT) * pw,
-      y: H - pad.bottom - ((m - 1) / (maxM - 1)) * ph,
-    }
+    const x = pad.left + (t / maxT) * pw
+    const y = H - pad.bottom - ((m - 1) / Math.max(maxM - 1, 1)) * ph
+    return { x, y }
   }
 
-  // ── Spribe uses RED for the curve, always ──
-  const lineColor = isCrashed ? '#f23645' : '#f23645'
-  const glowColor = isCrashed ? 'rgba(242,54,69,0.18)' : 'rgba(242,54,69,0.18)'
-  const fillTop   = isCrashed ? 'rgba(242,54,69,0.08)' : 'rgba(242,54,69,0.08)'
-
   // fill under curve
+  ctx.save()
   ctx.beginPath()
   const p0 = toS(points[0].t, points[0].m)
   ctx.moveTo(p0.x, H - pad.bottom)
@@ -266,9 +271,11 @@ function drawCurve(ctx, W, H, points, currentMult, isCrashed) {
   ctx.lineTo(last.x, H - pad.bottom)
   ctx.closePath()
   const fillGrad = ctx.createLinearGradient(0, pad.top, 0, H - pad.bottom)
-  fillGrad.addColorStop(0, fillTop)
-  fillGrad.addColorStop(1, 'rgba(242,54,69,0.01)')
-  ctx.fillStyle = fillGrad; ctx.fill()
+  fillGrad.addColorStop(0,   'rgba(232,25,44,0.22)')
+  fillGrad.addColorStop(0.6, 'rgba(232,25,44,0.07)')
+  fillGrad.addColorStop(1,   'rgba(232,25,44,0.01)')
+  ctx.fillStyle = fillGrad
+  ctx.fill()
 
   // glow pass
   ctx.beginPath()
@@ -276,8 +283,8 @@ function drawCurve(ctx, W, H, points, currentMult, isCrashed) {
   for (let i = 1; i < points.length; i++) {
     const p = toS(points[i].t, points[i].m); ctx.lineTo(p.x, p.y)
   }
-  ctx.strokeStyle = glowColor
-  ctx.lineWidth = 10
+  ctx.strokeStyle = 'rgba(232,25,44,0.22)'
+  ctx.lineWidth = 9
   ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke()
 
   // main line
@@ -286,29 +293,43 @@ function drawCurve(ctx, W, H, points, currentMult, isCrashed) {
   for (let i = 1; i < points.length; i++) {
     const p = toS(points[i].t, points[i].m); ctx.lineTo(p.x, p.y)
   }
-  ctx.strokeStyle = lineColor
-  ctx.lineWidth = 2.5
-  ctx.shadowColor = lineColor; ctx.shadowBlur = 8
+  ctx.strokeStyle = '#e8192c'
+  ctx.lineWidth = 2.8
+  ctx.shadowColor = '#e8192c'; ctx.shadowBlur = 10
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round'
   ctx.stroke(); ctx.shadowBlur = 0
 
-  // Y-axis labels
-  ctx.fillStyle = 'rgba(255,255,255,0.18)'
-  ctx.font = '10px "Roboto Mono", monospace'
-  ctx.textAlign = 'right'
-  const step = Math.ceil(maxM / 5)
-  for (let m = 1; m <= Math.ceil(maxM); m += step) {
+  // Y-axis mult labels on the right side (Spribe style)
+  ctx.fillStyle = 'rgba(255,255,255,0.15)'
+  ctx.font = `${Math.max(9, Math.min(11, W / 50))}px "Roboto Mono", monospace`
+  ctx.textAlign = 'left'
+  const labelStep = maxM <= 3 ? 0.5 : maxM <= 6 ? 1 : maxM <= 12 ? 2 : Math.ceil(maxM / 5)
+  for (let m = 1; m <= Math.ceil(maxM) + labelStep; m += labelStep) {
     const py = toS(0, m).y
     if (py > pad.top + 4 && py < H - pad.bottom - 4)
-      ctx.fillText(m + '×', pad.left - 6, py + 4)
+      ctx.fillText(m.toFixed(m < 3 ? 1 : 0) + '×', W - pad.right + 5, py + 4)
   }
 
-  // plane at tip (only when flying)
+  ctx.restore()
+
+  // ── PLANE at curve tip — always fully visible ──
   if (!isCrashed && points.length >= 2) {
-    const tip  = toS(points[points.length - 1].t, points[points.length - 1].m)
-    const prev = toS(points[points.length - 2].t, points[points.length - 2].m)
-    const angle = Math.atan2(tip.y - prev.y, tip.x - prev.x)
-    const planeScale = Math.min(W, H) / 480  // responsive scale
-    drawPlane(ctx, tip.x, tip.y, angle, planeScale)
+    const raw   = toS(points[points.length - 1].t, points[points.length - 1].m)
+    const rawPr = toS(points[points.length - 2].t, points[points.length - 2].m)
+
+    // plane size: fixed 52px "radius" on desktop, smaller on mobile
+    const planeR = Math.max(28, Math.min(52, W / 14))
+    const planeScale = planeR / 36   // drawPlane body is ~36px half-width
+
+    // clamp so plane never clips edges
+    const px = Math.max(pad.left + planeR, Math.min(W - pad.right - planeR, raw.x))
+    const py = Math.max(pad.top  + planeR, Math.min(H - pad.bottom - planeR, raw.y))
+
+    // angle from prev point but clamp to -60°..+5° so it never points straight down
+    const rawAngle = Math.atan2(raw.y - rawPr.y, raw.x - rawPr.x)
+    const angle = Math.max(-Math.PI / 3, Math.min(Math.PI / 18, rawAngle))
+
+    drawPlane(ctx, px, py, angle, planeScale)
   }
 }
 
@@ -596,9 +617,11 @@ export default function GameCanvas() {
       if ((phase === 'flying' || phase === 'crashed') && startRef.current) {
         if (phase === 'flying') {
           const elapsed = (Date.now() - startRef.current) / 1000
-          pointsRef.current.push({ t: elapsed, m: Math.pow(Math.E, elapsed * 0.65) })
-          // cap buffer
-          if (pointsRef.current.length > 800) pointsRef.current = pointsRef.current.slice(-600)
+          // Spribe growth: starts slow (~1.05x at 1s), reaches 2x ~8s, 5x ~20s
+          // Formula: 1 + 0.06*t + 0.003*t^2  (gentle quadratic, not exponential)
+          const m = Math.max(1, 1 + 0.055 * elapsed + 0.0028 * elapsed * elapsed)
+          pointsRef.current.push({ t: elapsed, m })
+          if (pointsRef.current.length > 900) pointsRef.current = pointsRef.current.slice(-700)
         }
         if (pointsRef.current.length > 1)
           drawCurve(ctx, W, H, pointsRef.current, multiplier, phase === 'crashed')
